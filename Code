@@ -1,0 +1,208 @@
+import pandas as pd
+from datetime import datetime
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import nltk
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.styles import getSampleStyleSheet
+import textwrap
+
+# Download VADER lexicon
+nltk.download('vader_lexicon')
+
+# Function to save analysis report to a PDF file
+def save_report_pdf(file_name, user_info, user_symptoms, possible_disorders, summary, recommendation):
+    c = canvas.Canvas(file_name, pagesize=letter)
+    width, height = letter
+    styles = getSampleStyleSheet()
+    styleN = styles["BodyText"]
+    styleH = styles["Heading1"]
+
+    # Title
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(30, height - 50, "Mental Health Analysis Report")
+    c.setFont("Helvetica", 12)
+    c.drawString(30, height - 70, "=" * 70)
+
+    # User Information
+    c.drawString(30, height - 90, f"Name: {user_info['name']}")
+    c.drawString(30, height - 110, f"Age: {user_info['age']}")
+    c.drawString(30, height - 130, f"Gender: {user_info['gender']}")
+
+    # Entered Symptoms
+    c.drawString(30, height - 150, "Entered Symptoms:")
+    y = height - 170
+    for symptom in user_symptoms:
+        c.drawString(50, y, f"- {symptom}")
+        y -= 20
+
+    # Possible Disorders
+    c.drawString(30, y, "Possible Disorders based on entered symptoms:")
+    y -= 20
+    for disorder, count in possible_disorders.items():
+        c.drawString(50, y, f"{disorder}: {count} match(es)")
+        y -= 20
+
+    # Summary
+    c.drawString(30, y, "Summary:")
+    y -= 20
+    c.drawString(50, y, f"Total symptoms entered: {len(user_symptoms)}")
+    y -= 20
+    c.drawString(50, y, f"Total matching records: {summary['total_matches']}")
+    y -= 20
+
+    # Recommendation
+    c.drawString(30, y, "Recommendation:")
+    y -= 20
+    c.drawString(50, y, recommendation)
+    y -= 40
+
+    # Date and Time
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.drawString(30, y, f"Analysis Date and Time: {timestamp}")
+    y -= 20
+
+    # Disclaimer at the lower half
+    y -= 50
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(30, y, "Disclaimer:")
+    c.setFont("Helvetica", 10)
+    y -= 20
+    disclaimer_text = (
+        "This is a computer-generated report and is not a substitute for professional medical advice, diagnosis, or treatment. "
+        "Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition."
+    )
+    wrapped_disclaimer = textwrap.wrap(disclaimer_text, width=90)
+    for line in wrapped_disclaimer:
+        c.drawString(30, y, line)
+        y -= 20
+
+    c.save()
+
+# Function to get user information and symptoms
+def get_user_info_and_symptoms(df_columns):
+    user_info = {}
+    user_info['name'] = input("Please enter your name: ").strip()
+    user_info['age'] = input("Please enter your age: ").strip()
+    user_info['gender'] = input("Please enter your gender: ").strip()
+
+    user_symptoms = []
+    print("Please enter your symptoms one by one. Type 'done' when you are finished.")
+    while True:
+        user_input = input("Symptom: ").strip().lower().replace(" ", ".")
+        if user_input == 'done':
+            break
+        if user_input not in df_columns:
+            print("Symptom not found in the dataset. Please try again.")
+        else:
+            user_symptoms.append(user_input)
+    
+    return user_info, user_symptoms
+
+# Function to analyze symptoms
+def analyze_symptoms(df, user_symptoms):
+    matched_records = df.copy()
+    for symptom in user_symptoms:
+        matched_records = matched_records[matched_records[symptom] == 1]
+    return matched_records
+
+# Function to generate analysis report
+def generate_report(matched_records, user_symptoms):
+    if matched_records.empty:
+        print("\nNo matching records found in the dataset for the entered symptoms.")
+        return None, None
+    else:
+        print("\nPossible Disorders based on entered symptoms:")
+        possible_disorders = matched_records['Disorder'].value_counts().to_dict()
+        for disorder, count in possible_disorders.items():
+            print(f"{disorder}: {count} match(es)")
+
+        print("\nDetailed matching records (excluded from the report):")
+        display_columns = user_symptoms + ['Disorder']
+        detailed_records = matched_records[display_columns]
+        print(detailed_records.to_string(index=False))
+        
+        return possible_disorders, detailed_records
+
+# Function to perform sentiment analysis on user symptoms
+def perform_sentiment_analysis(user_symptoms):
+    sia = SentimentIntensityAnalyzer()
+    sentiments = {'positive': 0, 'neutral': 0, 'negative': 0}
+    
+    for symptom in user_symptoms:
+        sentiment_score = sia.polarity_scores(symptom)
+        if sentiment_score['compound'] >= 0.05:
+            sentiments['positive'] += 1
+        elif sentiment_score['compound'] <= -0.05:
+            sentiments['negative'] += 1
+        else:
+            sentiments['neutral'] += 1
+            
+    sentiment_summary = {
+        'positive': sentiments['positive'],
+        'neutral': sentiments['neutral'],
+        'negative': sentiments['negative']
+    }
+    
+    return sentiment_summary
+
+# Function to determine the severity and provide a recommendation
+def determine_severity(sentiment_summary):
+    total_symptoms = sum(sentiment_summary.values())
+    if sentiment_summary['negative'] / total_symptoms > 0.5:
+        return "High severity: It's recommended to consult a therapist immediately."
+    elif sentiment_summary['neutral'] / total_symptoms > 0.5:
+        return "Moderate severity: Consider consulting a therapist."
+    else:
+        return "Low severity: Keep monitoring your symptoms. Consult a therapist if conditions worsen."
+
+# Main function to run the analysis
+def main():
+    # Load dataset
+    file_path = 'D:/dataset/Mental disorder symptoms.xlsx'
+    df = pd.read_excel(file_path)
+
+    # Print the column names to inspect them
+    print("Columns in the dataset:")
+    print(df.columns)
+
+    # Get user information and symptoms
+    user_info, user_symptoms = get_user_info_and_symptoms(df.columns)
+
+    # Perform sentiment analysis on user symptoms
+    sentiment_summary = perform_sentiment_analysis(user_symptoms)
+
+    # Determine severity and provide recommendation
+    recommendation = determine_severity(sentiment_summary)
+
+    # Analyze symptoms based on the dataset
+    matched_records = analyze_symptoms(df, user_symptoms)
+
+    # Generate analysis report
+    possible_disorders, detailed_records = generate_report(matched_records, user_symptoms)
+
+    if possible_disorders is not None and detailed_records is not None:
+        # Generate a unique filename based on the current timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        report_file = f'Mental_Health_Analysis_Report_{timestamp}.pdf'
+        
+        # Save the report to a PDF file
+        summary = {
+            "total_symptoms": len(user_symptoms),
+            "total_matches": len(detailed_records)
+        }
+        save_report_pdf(report_file, user_info, user_symptoms, possible_disorders, summary, recommendation)
+        print(f"\nAnalysis report saved to {report_file}")
+
+        # Summary
+        print("\nSummary:")
+        print(f"Total symptoms entered: {len(user_symptoms)}")
+        print(f"Total matching records: {len(matched_records)}")
+        print(f"Sentiment Analysis Summary: {sentiment_summary}")
+        print(f"Recommendation: {recommendation}")
+
+if __name__ == "__main__":
+    main()
+
+
+
