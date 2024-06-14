@@ -1,0 +1,21 @@
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from .forms import SymptomForm
+from .utils import process_symptoms, save_report_pdf
+
+main = Blueprint('main', __name__)
+
+@main.route('/', methods=['GET', 'POST'])
+def index():
+    form = SymptomForm()
+    if form.validate_on_submit():
+        user_info = {
+            'name': form.name.data,
+            'age': form.age.data,
+            'gender': form.gender.data
+        }
+        user_symptoms = form.symptoms.data.split(',')
+        possible_disorders, detailed_records, sentiment_summary, recommendation, report_file = process_symptoms(user_info, user_symptoms)
+        if report_file:
+            flash(f'Report saved as {report_file}', 'success')
+        return render_template('results.html', disorders=possible_disorders, summary=sentiment_summary, recommendation=recommendation)
+    return render_template('index.html', form=form)
