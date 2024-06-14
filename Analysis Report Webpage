@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Analysis Results</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container">
+    <h1 class="mt-5">Analysis Results</h1>
+    <h3>Possible Disorders</h3>
+    <ul>
+        {% for disorder, count in disorders.items() %}
+        <li>{{ disorder }}: {{ count }} match(es)</li>
+        {% endfor %}
+    </ul>
+    <h3>Sentiment Summary</h3>
+    <ul>
+        <li>Positive: {{ summary.positive }}</li>
+        <li>Neutral: {{ summary.neutral }}</li>
+        <li>Negative: {{ summary.negative }}</li>
+    </ul>
+    <h3>Recommendation</h3>
+    <p>{{ recommendation }}</p>
+</div>
+</body>
+</html>
