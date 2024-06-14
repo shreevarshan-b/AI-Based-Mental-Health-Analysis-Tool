@@ -1,0 +1,66 @@
+import pandas as pd
+from datetime import datetime
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import nltk
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import textwrap
+
+nltk.download('vader_lexicon')
+
+# Function to save analysis report to a PDF file
+def save_report_pdf(file_name, user_info, user_symptoms, possible_disorders, summary, recommendation):
+    c = canvas.Canvas(file_name, pagesize=letter)
+    width, height = letter
+    # Add rest of the code here...
+
+# Function to analyze symptoms and generate the report
+def process_symptoms(user_info, user_symptoms):
+    file_path = 'dataset/Mental disorder symptoms.xlsx'
+    df = pd.read_excel(file_path)
+
+    # Perform sentiment analysis on user symptoms
+    sia = SentimentIntensityAnalyzer()
+    sentiments = {'positive': 0, 'neutral': 0, 'negative': 0}
+    
+    for symptom in user_symptoms:
+        sentiment_score = sia.polarity_scores(symptom)
+        if sentiment_score['compound'] >= 0.05:
+            sentiments['positive'] += 1
+        elif sentiment_score['compound'] <= -0.05:
+            sentiments['negative'] += 1
+        else:
+            sentiments['neutral'] += 1
+
+    sentiment_summary = {
+        'positive': sentiments['positive'],
+        'neutral': sentiments['neutral'],
+        'negative': sentiments['negative']
+    }
+
+    total_symptoms = sum(sentiment_summary.values())
+    negative_percentage = sentiment_summary['negative'] / total_symptoms
+
+    if negative_percentage > 0.5:
+        recommendation = "High severity: It's recommended to consult a therapist immediately."
+    elif negative_percentage > 0.2:
+        recommendation = "Moderate severity: Consider consulting a therapist."
+    else:
+        recommendation = "Low severity: Keep monitoring your symptoms. Consult a therapist if conditions worsen."
+
+    matched_records = df.copy()
+    for symptom in user_symptoms:
+        matched_records = matched_records[matched_records[symptom.replace(" ", ".")] == 1]
+
+    possible_disorders = matched_records['Disorder'].value_counts().to_dict()
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    report_file = f'Mental_Health_Analysis_Report_{timestamp}.pdf'
+    
+    summary = {
+        "total_symptoms": len(user_symptoms),
+        "total_matches": len(matched_records)
+    }
+    save_report_pdf(report_file, user_info, user_symptoms, possible_disorders, summary, recommendation)
+
+    return possible_disorders, matched_records, sentiment_summary, recommendation, report_file
