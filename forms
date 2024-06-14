@@ -1,0 +1,10 @@
+from flask_wtf import FlaskForm
+from wtforms import StringField, TextAreaField, SubmitField
+from wtforms.validators import DataRequired
+
+class SymptomForm(FlaskForm):
+    name = StringField('Name', validators=[DataRequired()])
+    age = StringField('Age', validators=[DataRequired()])
+    gender = StringField('Gender', validators=[DataRequired()])
+    symptoms = TextAreaField('Symptoms (comma-separated)', validators=[DataRequired()])
+    submit = SubmitField('Submit')
